@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <HubRoot>$(MSBuildThisFileDirectory)</HubRoot>
+    <HubVersionSource>$([System.IO.File]::ReadAllText('$(HubRoot)Version.cs'))</HubVersionSource>
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($(HubVersionSource), `Version\s*=\s*"([^"]+)"`).Groups[1].Value)</Version>
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**\bin\**;**\obj\**</DefaultItemExcludes>
+    <BaseOutputPath Condition="'$(HubOutputRoot)' != ''">$(HubOutputRoot)$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+</Project>

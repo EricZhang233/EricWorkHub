@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19044.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.19044.0</SupportedOSPlatformVersion>
+    <UseWinUI>true</UseWinUI>
+    <RootNamespace>EricWorkHub</RootNamespace>
+    <AssemblyName>EricWorkHub</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <ErrorOnUnsupportedTargetingPlatformVersion>false</ErrorOnUnsupportedTargetingPlatformVersion>
+    <AppxPackage>false</AppxPackage>
+    <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
+    <WindowsAppSDKUsePrerelease>false</WindowsAppSDKUsePrerelease>
+    <WindowsPackageType>None</WindowsPackageType>
+    <DisableEmbeddedXbf>false</DisableEmbeddedXbf>
+    <GenerateLibraryLayout>true</GenerateLibraryLayout>
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
+    <ApplicationIcon>ico.ico</ApplicationIcon>
+    <ApplicationManifest>$(MSBuildProjectDirectory)\obj\$(Configuration)\Hub.app.manifest</ApplicationManifest>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Test\**;Core\**;artifacts\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <Target Name="SyncManifestVersion" BeforeTargets="PrepareForBuild">
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(ApplicationManifest)'))"/>
+    <Copy SourceFiles="app.manifest" DestinationFiles="$(ApplicationManifest)"/>
+    <XmlPoke XmlInputPath="$(ApplicationManifest)" Query="/*[local-name()='assembly']/*[local-name()='assemblyIdentity']/@version" Value="$(AssemblyVersion)"/>
+  </Target>
+
+  <ItemGroup>
+    <Compile Include="Core/**/*.cs" Exclude="Core/bin/**;Core/obj/**"/>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8"/>
+    <PackageReference Include="YamlDotNet" Version="18.1.0"/>
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="1.8.251222000" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="1.8.260101001" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ico.ico" />
+    <EmbeddedResource Include="text.yaml" LogicalName="EricWorkHub.text.yaml"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="Assets\**\*" />
+  </ItemGroup>
+
+  <Target Name="UseIntermediateResourceLayout" BeforeTargets="PrepareForPublish" Condition="'$(_IsPublishing)' != 'true'">
+    <PropertyGroup><PublishDir>$(IntermediateOutputPath)publish\</PublishDir></PropertyGroup>
+  </Target>
+  <Target Name="ExcludeSourceXamlFromResourceLayout" AfterTargets="GetPackagingOutputs" DependsOnTargets="_CalculateXbfSupport">
+    <ItemGroup><PackagingOutputs Remove="@(PackagingOutputs)" Condition="'%(PackagingOutputs.Extension)' == '.xaml'"/></ItemGroup>
+  </Target>
+  <Target Name="ExcludeEmbeddedXamlFromOutput" AfterTargets="GetCopyToOutputDirectoryItems" BeforeTargets="_CopyOutOfDateSourceItemsToOutputDirectory;_CopyOutOfDateSourceItemsToOutputDirectoryAlways;_CopyDifferingSourceItemsToOutputDirectory" DependsOnTargets="_CalculateXbfSupport">
+    <ItemGroup>
+      <_SourceItemsToCopyToOutputDirectory Remove="@(_SourceItemsToCopyToOutputDirectory)" Condition="'%(_SourceItemsToCopyToOutputDirectory.Extension)' == '.xbf' Or '%(_SourceItemsToCopyToOutputDirectory.Extension)' == '.xaml'"/>
+      <_SourceItemsToCopyToOutputDirectoryAlways Remove="@(_SourceItemsToCopyToOutputDirectoryAlways)" Condition="'%(_SourceItemsToCopyToOutputDirectoryAlways.Extension)' == '.xbf' Or '%(_SourceItemsToCopyToOutputDirectoryAlways.Extension)' == '.xaml'"/>
+      <_SourceItemsToCopyToOutputDirectoryIfDifferent Remove="@(_SourceItemsToCopyToOutputDirectoryIfDifferent)" Condition="'%(_SourceItemsToCopyToOutputDirectoryIfDifferent.Extension)' == '.xbf' Or '%(_SourceItemsToCopyToOutputDirectoryIfDifferent.Extension)' == '.xaml'"/>
+      <AllItemsFullPathWithTargetPath Remove="@(AllItemsFullPathWithTargetPath)" Condition="'%(AllItemsFullPathWithTargetPath.Extension)' == '.xbf' Or '%(AllItemsFullPathWithTargetPath.Extension)' == '.xaml'"/>
+    </ItemGroup>
+  </Target>
+  <Target Name="EmbedCompiledXamlResources" AfterTargets="MarkupCompilePass2">
+    <PropertyGroup><_XamlResourceRoot>$([System.IO.Path]::GetFullPath('$(XamlGeneratedOutputPath)'))</_XamlResourceRoot></PropertyGroup>
+    <ItemGroup>
+      <_AssemblyXbf Include="@(_GeneratedXbfFiles->Distinct())"/>
+      <EmbeddedResource Include="@(_AssemblyXbf)">
+        <LogicalName>EricWorkHub.Xaml.$([System.IO.Path]::GetRelativePath('$(_XamlResourceRoot)', '%(_AssemblyXbf.FullPath)').Replace('\', '.').Replace('/', '.'))</LogicalName>
+        <WithCulture>false</WithCulture>
+      </EmbeddedResource>
+    </ItemGroup>
+    <Error Condition="'@(_AssemblyXbf)' == ''" Text="No compiled XAML resources were produced."/>
+  </Target>
+  <Import Project="Test/Test.targets"/>
+</Project>

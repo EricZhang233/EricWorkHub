@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19044.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>EricWorkHub.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CodeAnalysis"><HintPath>$(MSBuildToolsPath)/Roslyn/bincore/Microsoft.CodeAnalysis.dll</HintPath></Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp"><HintPath>$(MSBuildToolsPath)/Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll</HintPath></Reference>
+    <Compile Include="../Core/**/*.cs" Exclude="../Core/bin/**;../Core/obj/**" LinkBase="Core"/>
+    <Compile Include="../Version.cs" Link="Version.cs"/>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8"/>
+    <PackageReference Include="YamlDotNet" Version="18.1.0"/>
+    <PackageReference Include="System.Drawing.Common" Version="10.0.14"/>
+    <EmbeddedResource Include="../text.yaml" LogicalName="EricWorkHub.text.yaml"/>
+    <Compile Include="../UI/StableList.cs" Link="UI/StableList.cs"/>
+    <Compile Include="../UI/SystemIconReader.cs" Link="UI/SystemIconReader.cs"/>
+  </ItemGroup>
+</Project>

@@ -1,571 +1,379 @@
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
-using System;
+using Microsoft.UI.Xaml.Media;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Threading.Tasks;
-using Windows.Storage;
-using Windows.Storage.FileProperties;
+using System.Runtime.InteropServices;
+using WinRT.Interop;
 
-namespace MsOfficeHub
+namespace EricWorkHub;
+
+public sealed partial class MainWindow : Window
 {
-    public sealed partial class MainWindow : Window
+    public ObservableCollection<OfficeAppItem> OfficeApps { get; } = new();
+    public ObservableCollection<RecentItemViewModel> RecentItems { get; } = new();
+    private readonly DispatcherQueueTimer _timer;
+    private readonly CancellationTokenSource _shutdown = new();
+    private readonly HubService _hub = new();
+    private readonly OperationService _operations = new();
+    private readonly OfficeManagerService _officeManager = new();
+    private readonly IconService _icons = new();
+    private readonly ForegroundRefreshPolicy _refresh = new();
+    private bool _closed;
+    private XamlRoot? _titleBarXamlRoot;
+    private IntPtr _windowIcon;
+    private WindowStateTracker? _windowState;
+
+    public MainWindow()
     {
-        public ObservableCollection<OfficeAppItem> OfficeApps { get; } = new();
-        public ObservableCollection<RecentItem> RecentItems { get; } = new();
-        private readonly DispatcherQueueTimer _recentTimer;
-        private DateTimeOffset _lastRecentRefresh = DateTimeOffset.MinValue;
-        private static readonly TimeSpan RecentRefreshMinInterval = TimeSpan.FromSeconds(10);
-        private const string RegistryPath = @"Software\EricSoft\MsOfficeHub";
-
-        public MainWindow()
-        {
-            InitializeComponent();
-            LoadWindowState();
-            InitializeTitleBar();
-            _ = LoadOfficeAppsAsync();
-            _ = RefreshRecentAsync();
-
-            Activated += OnWindowActivated;
-
-            _recentTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
-            _recentTimer.Interval = TimeSpan.FromSeconds(60);
-            _recentTimer.Tick += async (_, _) => await RefreshRecentAsync();
-            _recentTimer.Start();
-        }
-
-        private void InitializeTitleBar()
-        {
-            SystemBackdrop = new DesktopAcrylicBackdrop();
-            ExtendsContentIntoTitleBar = true;
-            SetTitleBar(TitleBarGrid);
-            Title = "MsOfficeHub";
-            VersionText.Text = AppVersion.DisplayVersion;
-
-            var titleBar = AppWindow.TitleBar;
-            titleBar.ButtonBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
-            titleBar.ButtonInactiveBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
-
-            try
-            {
-                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-                using var stream = assembly.GetManifestResourceStream("MsOfficeHub.ico.ico");
-                if (stream != null)
-                {
-                    var tempIconPath = Path.Combine(Path.GetTempPath(), "MsOfficeHub_TempIcon.ico");
-                    using var fileStream = new FileStream(tempIconPath, FileMode.Create, FileAccess.Write);
-                    stream.CopyTo(fileStream);
-                    fileStream.Close();
-
-                    AppWindow.SetIcon(tempIconPath);
-                    TitleBarIcon.Source = new BitmapImage(new Uri(tempIconPath));
-                }
-            }
-            catch
-            {
-            }
-        }
-
-        private async Task LoadOfficeAppsAsync()
-        {
-            OfficeApps.Clear();
-            var definitions = new[]
-            {
-                new OfficeAppDefinition("Word", new[] { "WINWORD.EXE" }, Array.Empty<string>(), "word.png"),
-                new OfficeAppDefinition("Excel", new[] { "EXCEL.EXE" }, Array.Empty<string>(), "excel.png"),
-                new OfficeAppDefinition("PowerPoint", new[] { "POWERPNT.EXE" }, Array.Empty<string>(), "powerpoint.png"),
-                new OfficeAppDefinition("Outlook", new[] { "OUTLOOK.EXE" }, new[]
-                {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WindowsApps", "olk.exe")
-                }, "outlook.png"),
-                new OfficeAppDefinition("OneNote", new[] { "ONENOTE.EXE" }, Array.Empty<string>(), "onenote.png"),
-                new OfficeAppDefinition("Access", new[] { "MSACCESS.EXE" }, Array.Empty<string>(), "access.png"),
-                new OfficeAppDefinition("Publisher", new[] { "MSPUB.EXE" }, Array.Empty<string>(), "publisher.png"),
-                new OfficeAppDefinition("Teams", new[] { "TEAMS.EXE", "MS-TEAMS.EXE" }, new[]
-                {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Teams", "current", "Teams.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Teams", "current", "ms-teams.exe")
-                }, "teams.png"),
-                new OfficeAppDefinition("OneDrive", new[] { "ONEDRIVE.EXE" }, new[]
-                {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "OneDrive", "OneDrive.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft OneDrive", "OneDrive.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft OneDrive", "OneDrive.exe")
-                }, "onedrive.png"),
-                new OfficeAppDefinition("Microsoft 365 Copilot", new[] { "M365COPILOT.EXE", "COPILOTOFFICE.EXE" }, Array.Empty<string>(), "copilot.png"),
-                new OfficeAppDefinition("Clipchamp", new[] { "CLIPCHAMP.EXE" }, Array.Empty<string>(), "clipchamp.png"),
-                new OfficeAppDefinition("Project", new[] { "WINPROJ.EXE" }, Array.Empty<string>(), "project.png"),
-                new OfficeAppDefinition("Visio", new[] { "VISIO.EXE" }, Array.Empty<string>(), "visio.png"),
-                new OfficeAppDefinition("Skype for Business", new[] { "LYNC.EXE" }, Array.Empty<string>(), "skype.png")
-            };
-
-            var detector = new OfficeDetector();
-
-            foreach (var definition in definitions)
-            {
-                var detection = detector.Detect(definition.ExeNames, definition.ExtraPaths, ConfigService.ForceShowAllApps);
-                if (!detection.IsInstalled && !ConfigService.ForceShowAllApps)
-                {
-                    continue;
-                }
-
-                var launchPath = detection.InstallPath;
-                if (string.IsNullOrWhiteSpace(launchPath) && definition.ExeNames.Length > 0)
-                {
-                    launchPath = definition.ExeNames[0];
-                }
-
-                var fallbackIcon = await TryLoadFallbackIconAsync(definition.FallbackFileName);
-                var item = new OfficeAppItem(definition.Name, fallbackIcon, launchPath);
-                OfficeApps.Add(item);
-
-                if (!string.IsNullOrWhiteSpace(detection.InstallPath))
-                {
-                    var icon = await TryLoadFileIconAsync(detection.InstallPath);
-                    if (icon != null)
-                    {
-                        item.Icon = icon;
-                    }
-                }
-            }
-        }
-
-        private async Task<ImageSource?> TryLoadFallbackIconAsync(string fileName)
-        {
-            if (string.IsNullOrWhiteSpace(fileName))
-            {
-                return null;
-            }
-
-            var resourceName = $"Assets.Office.{fileName}";
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
-            {
-                return null;
-            }
-
-            var image = new BitmapImage();
-            await image.SetSourceAsync(stream.AsRandomAccessStream());
-            return image;
-        }
-
-        private async Task<ImageSource?> TryLoadFileIconAsync(string path)
-        {
-            try
-            {
-                var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
-                using var thumbnail = await file.GetThumbnailAsync(Windows.Storage.FileProperties.ThumbnailMode.SingleItem, 64);
-                if (thumbnail == null || thumbnail.Size == 0)
-                {
-                    return null;
-                }
-
-                var image = new BitmapImage();
-                await image.SetSourceAsync(thumbnail);
-                return image;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
-        private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes, ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-        private static extern bool DestroyIcon(IntPtr hIcon);
-
-        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
-        private struct SHFILEINFO
-        {
-            public IntPtr hIcon;
-            public int iIcon;
-            public uint dwAttributes;
-            [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 260)]
-            public string szDisplayName;
-            [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 80)]
-            public string szTypeName;
-        }
-
-        private const uint SHGFI_ICON = 0x000000100;
-        private const uint SHGFI_LARGEICON = 0x000000000;
-        private const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
-        private const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
-
-        private readonly System.Collections.Generic.Dictionary<string, ImageSource> _fileIconCache = new();
-        private readonly System.Collections.Generic.Dictionary<string, ImageSource> _extensionIconCache = new(StringComparer.OrdinalIgnoreCase);
-
-        private async Task<ImageSource?> GetIconForExtensionAsync(string extension)
-        {
-            if (string.IsNullOrEmpty(extension)) return null;
-            if (!extension.StartsWith(".")) extension = "." + extension;
-
-            if (_extensionIconCache.TryGetValue(extension, out var cached) && cached != null)
-            {
-                return cached;
-            }
-
-            try
-            {
-                var shinfo = new SHFILEINFO();
-                var cbFileInfo = (uint)System.Runtime.InteropServices.Marshal.SizeOf(shinfo);
-                SHGetFileInfo(extension, FILE_ATTRIBUTE_NORMAL, ref shinfo, cbFileInfo, SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES);
-
-                if (shinfo.hIcon != IntPtr.Zero)
-                {
-                    using var icon = System.Drawing.Icon.FromHandle(shinfo.hIcon);
-                    using var bmp = icon.ToBitmap();
-                    using var ms = new System.IO.MemoryStream();
-                    bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                    ms.Position = 0;
-
-                    var image = new BitmapImage();
-                    await image.SetSourceAsync(ms.AsRandomAccessStream());
-
-                    DestroyIcon(shinfo.hIcon);
-                    _extensionIconCache[extension] = image;
-                    return image;
-                }
-            }
-            catch
-            {
-            }
-            return null;
-        }
-
-        private async Task<ImageSource?> GetRecentItemIconAsync(RecentItem item)
-        {
-            // 尝试获取本地文件的系统自带缩略图/图标
-            bool isLocalFile = false;
-            string extension = string.Empty;
-
-            if (!string.IsNullOrWhiteSpace(item.Location))
-            {
-                if (Uri.TryCreate(item.Location, UriKind.Absolute, out var uri))
-                {
-                    isLocalFile = uri.IsFile;
-                    try
-                    {
-                        extension = System.IO.Path.GetExtension(uri.LocalPath);
-                    }
-                    catch { }
-                }
-                else
-                {
-                    isLocalFile = true;
-                    try
-                    {
-                        extension = System.IO.Path.GetExtension(item.Location);
-                    }
-                    catch { }
-                }
-            }
-
-            if (isLocalFile)
-            {
-                var systemIcon = await TryLoadFileIconAsync(item.Location);
-                if (systemIcon != null)
-                {
-                    return systemIcon;
-                }
-            }
-
-            // 对于云文档或者本地文件系统图标获取失败（文件可能不存在被移动）的情况，尝试根据后缀名生成假文件来获取系统类型图标
-            if (!string.IsNullOrEmpty(extension))
-            {
-                var extIcon = await GetIconForExtensionAsync(extension);
-                if (extIcon != null)
-                {
-                    return extIcon;
-                }
-            }
-
-            // 如果连根据后缀获取图标也失败，触发兜底，使用应用主图标
-            if (string.IsNullOrWhiteSpace(item.App)) return null;
-            var baseName = item.App.ToLowerInvariant();
-
-            if (_fileIconCache.TryGetValue(baseName, out var cached) && cached != null)
-            {
-                return cached;
-            }
-
-            var appIcon = await TryLoadFallbackIconAsync($"{baseName}.png");
-            if (appIcon != null)
-            {
-                _fileIconCache[baseName] = appIcon;
-                return appIcon;
-            }
-
-            return null;
-        }
-
-        private async Task RefreshRecentAsync(bool force = false)
-        {
-            if (!force && DateTimeOffset.Now - _lastRecentRefresh < RecentRefreshMinInterval)
-            {
-                return;
-            }
-
-            _lastRecentRefresh = DateTimeOffset.Now;
-            var items = await Task.Run(() => Recent.GetItems(new RecentOptions
-            {
-                MaxItems = 50,
-                UseInstalledAppsOnly = true,
-                IncludeRegistry = true,
-                IncludeCache = true,
-                IncludeEdgeHistory = true
-            }));
-
-            // 预渲染并准备新项目列表
-            var newItems = new System.Collections.Generic.List<RecentItem>();
-            foreach (var item in items)
-            {
-                item.Icon = await GetRecentItemIconAsync(item);
-                newItems.Add(item);
-            }
-
-            // 原地差异化更新 ObservableCollection 以消除 UI 闪烁
-            for (int i = 0; i < newItems.Count; i++)
-            {
-                if (i < RecentItems.Count)
-                {
-                    // 仅当项目发生实质变动时才覆盖，避免无谓的 UI 重绘
-                    if (RecentItems[i].Location != newItems[i].Location || 
-                        RecentItems[i].TimestampText != newItems[i].TimestampText)
-                    {
-                        RecentItems[i] = newItems[i];
-                    }
-                }
-                else
-                {
-                    RecentItems.Add(newItems[i]);
-                }
-            }
-
-            // 移除多余的旧项目
-            while (RecentItems.Count > newItems.Count)
-            {
-                RecentItems.RemoveAt(RecentItems.Count - 1);
-            }
-        }
-
-        private void OfficeList_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            if (e.ClickedItem is not OfficeAppItem app)
-            {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(app.LaunchPath))
-            {
-                return;
-            }
-
-            try
-            {
-                Process.Start(new ProcessStartInfo(app.LaunchPath) { UseShellExecute = true });
-            }
-            catch
-            {
-            }
-        }
-
-        private DateTime _lastOpenTime = DateTime.MinValue;
-
-        private void RecentList_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            if ((DateTime.Now - _lastOpenTime).TotalMilliseconds < 1000)
-            {
-                return;
-            }
-            _lastOpenTime = DateTime.Now;
-
-            if (e.ClickedItem is not RecentItem recent)
-            {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(recent.Location))
-            {
-                return;
-            }
-
-            try
-            {
-                if (Uri.TryCreate(recent.Location, UriKind.Absolute, out var uri) && !uri.IsFile)
-                {
-                    Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
-                    return;
-                }
-
-                if (File.Exists(recent.Location))
-                {
-                    Process.Start(new ProcessStartInfo(recent.Location) { UseShellExecute = true });
-                }
-            }
-            catch
-            {
-            }
-        }
-
-        private void LoadWindowState()
-        {
-            try
-            {
-                using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RegistryPath);
-                if (key != null)
-                {
-                    int width = (int)key.GetValue("WindowWidth", 800);
-                    int height = (int)key.GetValue("WindowHeight", 600);
-                    int x = (int)key.GetValue("WindowX", -1);
-                    int y = (int)key.GetValue("WindowY", -1);
-                    double leftColumnWidth = Convert.ToDouble(key.GetValue("LeftColumnWidth", 220.0));
-
-                    if (width > 0 && height > 0)
-                    {
-                        this.AppWindow.Resize(new Windows.Graphics.SizeInt32(width, height));
-                    }
-
-                    if (x >= 0 && y >= 0)
-                    {
-                        var displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(
-                            this.AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
-
-                        var work = displayArea.WorkArea;
-                        int workLeft = work.X;
-                        int workTop = work.Y;
-                        int workRight = work.X + work.Width;
-                        int workBottom = work.Y + work.Height;
-
-                        if (x < workRight && x + width > workLeft &&
-                            y < workBottom && y + height > workTop)
-                        {
-                            this.AppWindow.Move(new Windows.Graphics.PointInt32(x, y));
-                        }
-                    }
-
-                    // 恢复 GridSplitter 的分栏宽度
-                    if (leftColumnWidth >= LeftColumn.MinWidth && leftColumnWidth <= LeftColumn.MaxWidth)
-                    {
-                        LeftColumn.Width = new GridLength(leftColumnWidth);
-                    }
-                }
-            }
-            catch { }
-        }
-
-        private void Window_Closed(object sender, WindowEventArgs args)
-        {
-            try
-            {
-                using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RegistryPath);
-                if (key != null)
-                {
-                    var pos = this.AppWindow.Position;
-                    var size = this.AppWindow.Size;
-
-                    // 仅当窗口未最小化时保存坐标
-                    if (size.Width > 0 && size.Height > 0)
-                    {
-                        key.SetValue("WindowX", pos.X, Microsoft.Win32.RegistryValueKind.DWord);
-                        key.SetValue("WindowY", pos.Y, Microsoft.Win32.RegistryValueKind.DWord);
-                        key.SetValue("WindowWidth", size.Width, Microsoft.Win32.RegistryValueKind.DWord);
-                        key.SetValue("WindowHeight", size.Height, Microsoft.Win32.RegistryValueKind.DWord);
-                    }
-
-                    // 保存左右栏宽度
-                    key.SetValue("LeftColumnWidth", LeftColumn.Width.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                }
-            }
-            catch { }
-        }
-
-        private async void OnWindowActivated(object sender, WindowActivatedEventArgs args)
-        {
-            if (args.WindowActivationState != WindowActivationState.Deactivated)
-            {
-                await RefreshRecentAsync();
-            }
-        }
-
-        private static ListViewItem? FindListViewItem(DependencyObject source)
-        {
-            var current = source;
-            while (current != null)
-            {
-                if (current is ListViewItem item)
-                {
-                    return item;
-                }
-
-                current = VisualTreeHelper.GetParent(current);
-            }
-
-            return null;
-        }
-
+        InitializeComponent();
+        DocumentPanel.ResizeRequested += DocumentPanel_ResizeRequested;
+        InitializeTitleBar();
+        LoadWindowState();
+        AppWindow.Changed += WindowChanged;
+        Activated += OnWindowActivated;
+        _timer = DispatcherQueue.CreateTimer();
+        _timer.Interval = ForegroundRefreshPolicy.Interval;
+        _timer.Tick += OnTimer;
+
+        ApplyApps(_hub.Snapshot.Apps, false);
     }
 
-    public sealed class OfficeAppItem : INotifyPropertyChanged
+    private void InitializeTitleBar()
     {
-        private ImageSource? _icon;
-
-        public OfficeAppItem(string displayName, ImageSource? icon, string? launchPath)
+        if (Microsoft.UI.Composition.SystemBackdrops.DesktopAcrylicController.IsSupported()) SystemBackdrop = new DesktopAcrylicBackdrop();
+        ExtendsContentIntoTitleBar = true;
+        Title = "EricWorkHub";
+        TitleBarText.Text = Title;
+        SetTitleBar(TitleBarDragRegion);
+        TitleBarGrid.Loaded += TitleBarGrid_Loaded;
+        TitleBarGrid.SizeChanged += TitleBarGrid_SizeChanged;
+        VersionText.Text = AppVersion.DisplayVersion;
+        AppWindow.TitleBar.ButtonBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+        AppWindow.TitleBar.ButtonInactiveBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+        try
         {
-            DisplayName = displayName;
-            _icon = icon;
-            LaunchPath = launchPath;
-        }
-
-        public string DisplayName { get; }
-        public string? LaunchPath { get; }
-        public ImageSource? Icon
-        {
-            get => _icon;
-            set
+            _windowIcon = AppIconService.GetDefaultIconHandle();
+            if (_windowIcon != IntPtr.Zero)
             {
-                if (!Equals(_icon, value))
-                {
-                    _icon = value;
-                    OnPropertyChanged(nameof(Icon));
-                    OnPropertyChanged(nameof(ImageVisibility));
-                }
+                IntPtr window = WindowNative.GetWindowHandle(this);
+                SendMessage(window, 0x0080, (IntPtr)1, _windowIcon);
+                SendMessage(window, 0x0080, IntPtr.Zero, _windowIcon);
+            }
+            TitleBarIcon.Source = AppIconService.GetBitmapImage();
+        }
+        catch (Exception ex) { LogService.Write("Window", "Window icon unavailable", ex, level: LogService.LogLevel.Warn); }
+    }
+
+    private void TitleBarGrid_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (_titleBarXamlRoot != null) _titleBarXamlRoot.Changed -= TitleBarXamlRoot_Changed;
+        _titleBarXamlRoot = TitleBarGrid.XamlRoot;
+        if (_titleBarXamlRoot != null) _titleBarXamlRoot.Changed += TitleBarXamlRoot_Changed;
+        UpdateTitleBarInsets();
+    }
+
+    private void TitleBarGrid_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateTitleBarInsets();
+    private void TitleBarXamlRoot_Changed(XamlRoot sender, XamlRootChangedEventArgs args) => UpdateTitleBarInsets();
+    private void UpdateTitleBarInsets()
+    {
+        if (TitleBarGrid.XamlRoot == null || _closed) return;
+        try
+        {
+            double scale = TitleBarGrid.XamlRoot.RasterizationScale;
+            if (scale <= 0) return;
+            double right = AppWindow.TitleBar.RightInset / scale + 12;
+            if (Math.Abs(TitleBarActionsPanel.Margin.Right - right) < 0.1) return;
+            TitleBarActionsPanel.Margin = new Thickness(0, 0, right, 0);
+            LogService.Write("UI", $"Title bar caption inset updated right={right:F1} scale={scale:F2}");
+        }
+        catch (Exception ex) { LogService.Write("UI", "Title bar caption inset update failed", ex, level: LogService.LogLevel.Warn); }
+    }
+
+    private void MenuAuthorIcon_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Image image) image.Source = AppIconService.GetBitmapImage();
+    }
+    private void MenuVersionText_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock text) text.Text = AppVersion.DisplayVersion;
+    }
+    private void AuthorText_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBlock text) text.Text = Text.T("Author");
+    }
+    private async void ProjectLink_Click(object sender, RoutedEventArgs e) => RenderOperation(await _operations.OpenProjectAsync(false));
+    private async void ReleasesLink_Click(object sender, RoutedEventArgs e) => RenderOperation(await _operations.OpenProjectAsync(true));
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr parameter, IntPtr value);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)] private static extern bool DestroyIcon(IntPtr icon);
+
+    private void OnTimer(DispatcherQueueTimer sender, object args)
+    {
+        if (!_refresh.RunTimer || _closed) return;
+        _ = RefreshAsync();
+    }
+
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        bool gained = _refresh.SetActive(args.WindowActivationState != WindowActivationState.Deactivated);
+        if (_refresh.RunTimer) _timer.Start();
+        else _timer.Stop();
+        if (gained) _ = RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (!_refresh.TryBegin()) return;
+        BusyIndicator.IsActive = true;
+        try
+        {
+            var snapshot = await _hub.RefreshAsync(true, _shutdown.Token, ready =>
+            {
+                if (_closed) return;
+                ApplyApps(ready.Apps, false);
+                ApplyRecent(ready.Documents);
+                UpdateAppsEmptyState();
+            });
+            if (!_closed && snapshot != null)
+            {
+                ApplyRecent(snapshot.Documents);
+                Notification.IsOpen = snapshot.Warnings.Count > 0;
+                if (snapshot.Warnings.Count > 0) ShowWarning(string.Join(Text.T("MessageSeparator"), snapshot.Warnings));
+                UpdateAppsEmptyState();
             }
         }
-
-        public Visibility ImageVisibility => Icon == null ? Visibility.Collapsed : Visibility.Visible;
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        private void OnPropertyChanged(string propertyName)
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+        finally
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            bool again = _refresh.Complete();
+            if (!_closed) BusyIndicator.IsActive = false;
+            if (again) _ = RefreshAsync();
         }
     }
 
-    internal sealed class OfficeAppDefinition
+    private void ApplyApps(IReadOnlyList<DetectedApp> apps, bool force)
     {
-        public OfficeAppDefinition(string name, string[] exeNames, string[] extraPaths, string fallbackFileName)
+        _icons.SetApplications(apps, force);
+        StableList.Apply(OfficeApps, apps, item => item.Model.Definition.Key, app => app.Definition.Key, app =>
         {
-            Name = name;
-            ExeNames = exeNames;
-            ExtraPaths = extraPaths;
-            FallbackFileName = fallbackFileName;
-        }
+            var item = new OfficeAppItem(app);
+            _ = LoadAppIconAsync(item);
+            return item;
+        }, (item, app) =>
+        {
+            bool reload = force || item.Icon == null || item.Model.Executable != app.Executable || item.Model.AppUserModelId != app.AppUserModelId;
+            item.Update(app);
+            if (reload) _ = LoadAppIconAsync(item);
+        });
+    }
 
-        public string Name { get; }
-        public string[] ExeNames { get; }
-        public string[] ExtraPaths { get; }
-        public string FallbackFileName { get; }
+    private async Task LoadAppIconAsync(OfficeAppItem item)
+    {
+        if (item.Model.Definition.IsOfficeManager) return;
+        int request = ++item.IconRequest;
+        try
+        {
+            var app = item.Model;
+            var icon = await _icons.ForAppAsync(app, _shutdown.Token);
+            if (!_closed && item.IconRequest == request && ReferenceEquals(item.Model, app)) item.Icon = icon;
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+        catch (Exception ex) { LogService.Write("Icon", "Application icon failed", ex, level: LogService.LogLevel.Warn); }
+    }
+
+    private void ApplyRecent(IReadOnlyList<RecentItem> items)
+    {
+        StableList.Apply(RecentItems, items, item => item.Model.Identity, item => item.Identity,
+            item => new RecentItemViewModel(item), (view, model) => view.Update(model));
+        foreach (var item in RecentItems)
+            if (RecentList.ContainerFromItem(item) is ListViewItem) _ = LoadDocumentIconAsync(item);
+    }
+
+    private void UpdateAppsEmptyState()
+    {
+        AppsEmpty.Visibility = OfficeApps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void RecentList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.InRecycleQueue || args.Item is not RecentItemViewModel item) return;
+        await LoadDocumentIconAsync(item);
+    }
+
+    private async Task LoadDocumentIconAsync(RecentItemViewModel item)
+    {
+        if (!item.Preview.TryBegin(out int request)) return;
+        try
+        {
+            var icon = await _icons.ForDocumentAsync(item.Model, _shutdown.Token);
+            if (item.Preview.Complete(request, icon != null) && !_closed) item.Icon = icon;
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { item.Preview.Complete(request, false); }
+        catch (Exception ex) { item.Preview.Complete(request, false); LogService.Write("Icon", "Visible document icon failed", ex, level: LogService.LogLevel.Warn); }
+    }
+
+    private void Document_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
+    {
+        if (sender is not FrameworkElement element || element.DataContext is not RecentItemViewModel item) return;
+        args.Handled = true;
+        var target = DocumentActions.Menu(item.Model);
+        var menu = new MenuFlyout();
+        var reveal = new MenuFlyoutItem { Text = Text.T(target.IsWeb ? "OpenWebLocation" : "RevealDocument"), Icon = new FontIcon { Glyph = "\uE838" } };
+        var copy = new MenuFlyoutItem { Text = Text.T(target.IsLink ? "CopyLink" : "CopyPath"), Icon = new FontIcon { Glyph = "\uE8C8" } };
+        reveal.Click += async (_, _) => RenderOperation(await _operations.OpenContainingLocationAsync(item.Model));
+        copy.Click += (_, _) =>
+        {
+            try
+            {
+                var content = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                content.SetText(target.CopyText);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(content);
+                Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+                LogService.Write("Document", "Document target copied to clipboard");
+            }
+            catch (Exception ex) { LogService.Write("Document", "Copy target failed", ex, level: LogService.LogLevel.Warn); ShowWarning(Text.T("CopyFailed")); }
+        };
+        menu.Items.Add(reveal);
+        menu.Items.Add(copy);
+        if (args.TryGetPosition(element, out var position)) menu.ShowAt(element, new FlyoutShowOptions { Position = position });
+        else menu.ShowAt(element);
+    }
+    private async void OfficeList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is not OfficeAppItem app) return;
+        if (app.Model.Definition.IsOfficeManager) { await ShowOfficeManagerAsync(app); return; }
+        RenderOperation(await _operations.OpenAppAsync(app.Model));
+    }
+
+    private async Task ShowOfficeManagerAsync(OfficeAppItem item)
+    {
+        if (item.IsBusy) return;
+        item.IsBusy = true;
+        try
+        {
+            if (await _officeManager.FindRunningAsync(_shutdown.Token) is { } process)
+            {
+                RenderOfficeManager(new(process));
+                return;
+            }
+            if (_closed) return;
+            var menu = new MenuFlyout();
+            var repair = new MenuFlyoutItem { Text = Text.T("OfficeManagerRepair"), Icon = new FontIcon { Glyph = "\uE90F" } };
+            var install = new MenuFlyoutItem { Text = Text.T("OfficeManagerInstall"), Icon = new FontIcon { Glyph = "\uE896" } };
+            repair.Click += async (_, _) => await RunOfficeManagerAsync(item, OfficeManagerAction.Repair);
+            install.Click += async (_, _) => await RunOfficeManagerAsync(item, OfficeManagerAction.Install);
+            menu.Items.Add(repair);
+            menu.Items.Add(install);
+            menu.ShowAt(OfficeList.ContainerFromItem(item) as FrameworkElement ?? OfficeList);
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            LogService.Write("OfficeManager", "Office manager menu unavailable", ex, level: LogService.LogLevel.Error);
+            if (!_closed) ShowWarning(Text.T("OfficeManagerFailed"));
+        }
+        finally { item.IsBusy = false; }
+    }
+
+    private async Task RunOfficeManagerAsync(OfficeAppItem item, OfficeManagerAction action)
+    {
+        if (item.IsBusy) return;
+        item.IsBusy = true;
+        try { RenderOfficeManager(await _officeManager.RunAsync(action, _shutdown.Token)); }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
+        finally { item.IsBusy = false; }
+    }
+
+    private void RenderOfficeManager(OfficeManagerResult result)
+    {
+        if (_closed) return;
+        if (result.Process is { } process)
+        {
+            if (!OfficeWindowActivator.Activate(process)) ShowOfficeManagerMessage(Text.T("OfficeManagerRunning"), false);
+        }
+        else if (result.Message != null) ShowOfficeManagerMessage(result.Message, result.IsError);
+    }
+    private void ShowOfficeManagerMessage(string message, bool error)
+    {
+        Notification.Message = message;
+        Notification.Severity = error ? InfoBarSeverity.Warning : InfoBarSeverity.Informational;
+        Notification.IsOpen = true;
+    }
+    private async void RecentList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is RecentItemViewModel item)
+            RenderOperation(await _operations.OpenDocumentAsync(item.Model));
+    }
+    private async void OpenLogsButton_Click(object sender, RoutedEventArgs e) => RenderOperation(await _operations.OpenLogsAsync());
+    private void RenderOperation(string? error) { if (!_closed && error != null) ShowWarning(error); }
+    private void ShowWarning(string message) { Notification.Message = message; Notification.Severity = InfoBarSeverity.Warning; Notification.IsOpen = true; }
+
+    private void DocumentPanel_ResizeRequested(object? sender, double delta) => SetColumnWidth(LeftColumn.Width.Value + delta);
+    private void SetColumnWidth(double width) => LeftColumn.Width = new GridLength(Math.Clamp(width, LeftColumn.MinWidth, LeftColumn.MaxWidth));
+
+    private void LoadWindowState()
+    {
+        try
+        {
+            var areas = DisplayArea.FindAll();
+            var displays = new List<WindowBounds>();
+            for (int index = 0; index < areas.Count; index++)
+            {
+                var work = areas[index].WorkArea;
+                displays.Add(new(work.X, work.Y, work.Width, work.Height));
+            }
+            if (displays.Count == 0) throw new InvalidOperationException("No display work area available");
+            var state = WindowStateService.Load(new(AppWindow.Position.X, AppWindow.Position.Y, 900, 650), displays);
+            var bounds = WindowPlacement.Fit(state.Bounds, displays);
+            AppWindow.MoveAndResize(new(bounds.X, bounds.Y, bounds.Width, bounds.Height));
+            uint dpi = GetDpiForWindow(WindowNative.GetWindowHandle(this));
+            bounds = WindowPlacement.Restore(state.Bounds, state.Dpi, dpi, displays);
+            AppWindow.MoveAndResize(new(bounds.X, bounds.Y, bounds.Width, bounds.Height));
+            _windowState = new(state with { Bounds = bounds, Dpi = dpi });
+            SetColumnWidth(state.ColumnWidth);
+            if (state.Maximized && AppWindow.Presenter is OverlappedPresenter presenter) presenter.Maximize();
+        }
+        catch (Exception ex) { LogService.Write("Window", "Window bounds restore failed", ex, level: LogService.LogLevel.Warn); }
+    }
+
+    private void WindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (_closed || _windowState == null || sender.Presenter is not OverlappedPresenter presenter) return;
+        WindowMode mode = presenter.State switch
+        {
+            OverlappedPresenterState.Maximized => WindowMode.Maximized,
+            OverlappedPresenterState.Minimized => WindowMode.Minimized,
+            _ => WindowMode.Normal
+        };
+        _windowState.Observe(mode, new(sender.Position.X, sender.Position.Y, sender.Size.Width, sender.Size.Height), GetDpiForWindow(WindowNative.GetWindowHandle(this)));
+        if (mode == WindowMode.Minimized) { _refresh.SetActive(false); _timer.Stop(); }
+    }
+
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
+
+    private void Window_Closed(object sender, WindowEventArgs args)
+    {
+        WindowChanged(AppWindow, null!);
+        _closed = true;
+        DocumentPanel.ResizeRequested -= DocumentPanel_ResizeRequested;
+        _refresh.Close();
+        AppWindow.Changed -= WindowChanged;
+        _timer.Stop();
+        _timer.Tick -= OnTimer;
+        Activated -= OnWindowActivated;
+        _shutdown.Cancel();
+        TitleBarGrid.Loaded -= TitleBarGrid_Loaded;
+        TitleBarGrid.SizeChanged -= TitleBarGrid_SizeChanged;
+        if (_titleBarXamlRoot != null) _titleBarXamlRoot.Changed -= TitleBarXamlRoot_Changed;
+        if (_windowIcon != IntPtr.Zero) { DestroyIcon(_windowIcon); _windowIcon = IntPtr.Zero; }
+        if (_windowState != null) WindowStateService.Save(_windowState.State with { ColumnWidth = LeftColumn.Width.Value });
+        LogService.Write("App", "Main window closed; refresh cancelled");
+        LogService.FlushAndStop();
     }
 }

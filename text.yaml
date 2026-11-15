@@ -1,0 +1,76 @@
+More: 更多
+VersionDisplay: 'Ver.{0}'
+MessageSeparator: ' '
+OpenLogs: 打开日志文件夹
+ViewLogs: 查看日志
+Project: 项目主页
+Releases: 发布记录
+About: 关于 EricWorkHub，由 EricZhang 开发
+Author: Developed by EricZhang
+Apps: 应用
+Recent: 最近文档
+AppsEmpty: 未检测到可用应用，安装后将自动更新。
+AppDescription_Notepad: 纯文本编辑工具
+AppDescription_Paint: 绘图与图片编辑工具
+AppDescription_WordPad: 富文本编辑工具
+AppDescription_Word: 文字处理工具
+AppDescription_Excel: 表格与数据分析工具
+AppDescription_PowerPoint: 演示文稿工具
+AppDescription_Outlook: 邮件与日程工具
+AppDescription_OneNote: 笔记整理工具
+AppDescription_Access: 数据库管理工具
+AppDescription_Publisher: 桌面排版工具
+AppDescription_Teams: 团队沟通与协作工具
+AppDescription_OneDrive: 文件同步与云存储工具
+AppDescription_Copilot: AI 办公助手
+AppDescription_Clipchamp: 视频剪辑工具
+AppDescription_Project: 项目规划与进度管理工具
+AppDescription_Visio: 流程图与图表绘制工具
+AppDescription_Skype: 企业即时通信与会议工具
+AppDescription_OfficeManager: Office 安装与维护工具
+OfficeManagerTooltip: "Office Setup\n修改／修复已安装的 Office，或从微软获取最新安装器。\n已有安装或维护进程运行时直接切换到该进程。"
+OfficeManagerRepair: 修改／修复当前 Office
+OfficeManagerInstall: 获取并运行最新安装器
+OfficeManagerBusy: 正在处理 Office 安装与维护…
+OfficeManagerRunning: Office 安装或维护程序已在运行，请在任务栏切换；不会重复下载安装器。
+OfficeManagerFailed: 无法打开 Office 安装与维护入口。请检查网络或稍后重试，详情见日志。
+RevealDocument: 打开所在位置
+OpenWebLocation: 打开网页目录
+CopyPath: 复制路径
+CopyLink: 复制链接
+CopyFailed: 无法复制路径或链接，请稍后重试。
+AppDescriptionTooltip: "{0}\n{1}"
+OpenWebFailed: 无法打开网页，详情见日志。
+RefreshFailed: 无法更新列表，已保留原有内容。可稍后重试，详情见日志。
+OpenFailed: 打开失败，请检查应用、文件位置或网络连接。详情见日志。
+OpenLogsFailed: 无法打开日志文件夹。
+UnsupportedDocument: 不支持的文档地址。
+MissingDocument: 文件已移动或删除，请刷新列表。
+MissingApp: 应用不可用，请重新检测已安装应用。
+PackageEntryFailed: 部分商店应用无法识别，可稍后重新检测。
+PackageDetectionFailed: 商店应用检测暂不可用，传统应用检测仍可使用。
+EdgeFailed: 'Edge {0} 历史暂不可读，稍后会重试。'
+TimeUnknown: 访问时间未知
+TimeModified: '修改于 '
+TimeRecorded: '记录更新于 '
+TimeAccessed: '访问于 '
+TimeFormat: yyyy-MM-dd HH:mm
+ListSeparator: '、'
+StatusSeparator: ' · '
+NetworkDocument: 网络或暂不可访问的位置
+Notebook: OneNote 笔记
+CloudDocument: 云文档
+LocalDocument: 本地文档
+SourceFailed: '{0}读取失败，其他来源仍可使用。'
+SourceOffice: Office 最近记录
+SourceCache: Office 最近文件缓存
+SourceWindows: Windows 最近项目
+SourceJumpList: 应用跳转列表
+SourceEdge: Edge PDF 历史
+OfficeFailed: 部分 Office 最近记录无法读取。
+CacheFailed: 部分 Office 缓存无法读取。
+Cache: Office 缓存
+Notebooks: OneNote 已打开笔记本
+AppRecent: '{0} 最近记录'
+AppJumpList: '{0} 跳转列表'
+AppRecentFailed: '{0} 的系统最近记录暂不可读。'

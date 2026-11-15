@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup><IsTestProject>false</IsTestProject></PropertyGroup>
+  <Target Name="RunHubTests" BeforeTargets="VSTest">
+    <Exec Command="pwsh.exe -NoProfile -NonInteractive -File &quot;$(MSBuildThisFileDirectory)Scripts/RunTests.ps1&quot; -NuGetAudit &quot;$(NuGetAudit)&quot;" WorkingDirectory="$(MSBuildThisFileDirectory).." StdOutEncoding="utf-8" StdErrEncoding="utf-8" UseUtf8Encoding="Always"/>
+  </Target>
+</Project>
