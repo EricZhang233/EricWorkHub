@@ -36,7 +36,8 @@ if (args is ["--validate-release", var releaseArchive, var releaseRepository])
     return;
 }
 
-string root = Path.Combine(AppContext.BaseDirectory, "EricWorkHub.Tests." + Guid.NewGuid().ToString("N"));
+string testCache = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "eric", "ericworkhub", "tests"));
+string root = Path.Combine(testCache, "EricWorkHub.Tests." + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 ConfigService.CachePathOverride = root;
 string logDirectory = Path.Combine(root, "log");
@@ -402,7 +403,7 @@ finally
 {
     LogService.FlushAndStop();
     string resolved = Path.GetFullPath(root);
-    if (resolved.StartsWith(Path.GetFullPath(AppContext.BaseDirectory), StringComparison.OrdinalIgnoreCase)
+    if (resolved.StartsWith(testCache + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
         && Path.GetFileName(resolved).StartsWith("EricWorkHub.Tests.", StringComparison.Ordinal)) Directory.Delete(resolved, true);
 }
 

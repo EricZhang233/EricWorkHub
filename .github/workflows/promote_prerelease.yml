@@ -1,4 +1,4 @@
-name: Promote Prerelease to Latest
+name: EricWorkHub-PromotePrerelease
 
 on:
   schedule:

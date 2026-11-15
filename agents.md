@@ -57,7 +57,7 @@
 ### 六、验证与构建
 
 - Debug：`dotnet build EricWorkHub.csproj -c Debug`。
-- 测试：根目录 `dotnet test`；样本与日志压力数据放在隔离目录，不打开真实 Office 文档。测试用发行产物只能在隔离目录生成，不作为正式发行包。
+- 测试：根目录 `dotnet test`；样本与日志压力数据放在 `%TEMP%\eric\ericworkhub\tests` 的隔离目录，不打开真实 Office 文档。打包暂存与静态验收临时文件也使用系统临时目录，结束后清理。测试用发行产物只能在隔离目录生成，不作为正式发行包。
 - `.github/scripts/Package.ps1` 供 GitHub 构建发行包使用；正式产物不在本地构建或提交进源码仓库。
 - 发行包不包含仓库 LICENSE 和 README 文件。
 - 所有者明确要求查看 Release 包时，允许使用 `Package.ps1 -Preview` 在隔离目录生成本地预览；该操作不触发 GitHub 发布。默认发行布局与 EGL 一致，依赖共享 .NET 10 与 Windows App SDK 1.8，内嵌 XBF 和启动配置，排除运行库、未使用的 SDK 组件与调试符号。

@@ -8,10 +8,12 @@ $version = [regex]::Match($source, 'Version\s*=\s*"(\d+\.\d+\.\d+)"').Groups[1].
 if (!$version -or $Tag -cne "v$version") { throw 'Release tag must match Version.cs exactly' }
 $destination = [IO.Path]::GetFullPath($OutputDirectory)
 if ((Test-Path -LiteralPath $destination) -and (Get-ChildItem -LiteralPath $destination -Force | Select-Object -First 1)) { throw 'Package output directory must be empty' }
-$staging = Join-Path $destination ('stage-' + [Guid]::NewGuid().ToString('N'))
+$cacheRoot = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) 'eric/ericworkhub/package'))
+$staging = Join-Path $cacheRoot ('stage-' + [Guid]::NewGuid().ToString('N'))
 $payload = Join-Path $staging 'app'
 $buildRoot = (Join-Path $staging 'build') + [IO.Path]::DirectorySeparatorChar
 New-Item -ItemType Directory -Path $payload -Force | Out-Null
+New-Item -ItemType Directory -Path $destination -Force | Out-Null
 try {
     dotnet build (Join-Path $root 'EricWorkHub.csproj') -c Release -r win-x64 -p:SelfContained=false -p:WindowsAppSDKSelfContained=false "-p:HubOutputRoot=$buildRoot" "-p:NuGetAudit=$NuGetAudit" --ignore-failed-sources
     if ($LASTEXITCODE -ne 0) { throw 'Release build failed' }
@@ -32,6 +34,6 @@ try {
     Write-Output "Package: $archive"
 } finally {
     $resolved = [IO.Path]::GetFullPath($staging)
-    if (!$resolved.StartsWith($destination.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe staging path' }
+    if (!$resolved.StartsWith($cacheRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe staging path' }
     if (Test-Path -LiteralPath $resolved) { Remove-Item -LiteralPath $resolved -Recurse -Force }
 }

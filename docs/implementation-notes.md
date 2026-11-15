@@ -107,11 +107,11 @@ dotnet test
 
 回归仅使用自己的临时样本，覆盖 MRU、协议与身份、跨源跨应用合并、各应用扩展名、Windows Recent、只读 SQLite/WAL、缓存失效、刷新互斥／取消、多屏边界及日志压力。不会打开真实 Office 示例文档或改写真实浏览器历史。
 
-普通编译不自动运行测试、打包或删除 bin/obj。本地只编译 Debug，正式包只由 GitHub 构建；本地测试不打开 Office 文档、不恢复实机自动化。终端脚本使用 `pwsh.exe`。无法访问 NuGet 审计源时，可在本地明确使用 `dotnet test -p:NuGetAudit=false` 验证缓存依赖；这不代表完成了依赖漏洞审计。
+普通编译不自动运行测试、打包或删除 bin/obj。本地只编译 Debug，正式包只由 GitHub 构建；本地测试不打开 Office 文档、不恢复实机自动化。测试工程通过 `dotnet` 宿主直接运行测试程序集，根目录 `dotnet test` 仍为统一入口。终端脚本使用 `pwsh.exe`。无法访问 NuGet 审计源时，可在本地明确使用 `dotnet test -p:NuGetAudit=false` 验证缓存依赖；这不代表完成了依赖漏洞审计。
 
 发行布局与 EGL 一致：共享 .NET 10 与 Windows App SDK 1.8 运行库；仅依赖 WinUI 与 Runtime 组件包，不引用拉入 AI、ML、Widgets、DWrite 的聚合包。未使用的投影组件在依赖图生成前排除；Release 禁用 PDB。XBF 直接内嵌到 UI 程序集，通过 `Application.ResourceManagerRequested` 与 `ResourceNotFound` 从字节资源解析，既不外置 PRI，也不运行时释放 XBF。启动配置通过 SDK 的 `GenerateBundle` 内嵌到 apphost，仅内嵌两份配置，程序集仍为外部 DLL；不启用需要额外兼容约束的 WinUI 单文件发布。
 
-`Package.ps1` 在最终 ZIP 生成后调用同一测试工程的静态包验收器：直接读取 ZIP、PE 元数据和 .NET bundle，不加载产品程序集或运行 EXE。检查 Release XBF 与构建输出一致、文案与源资源一致、apphost 内嵌 deps/runtimeconfig 的范围和格式、共享 .NET 10 与 x64 目标、EXE/DLL 版本，以及依赖图中每个托管／原生资产的存在、版本或位数。验收失败中止发布。原生文件版本读取使用 ZIP 旁唯一隔离目录并在完成后清理；普通根目录回归覆盖损坏的 bundle 头与越界条目。
+`Package.ps1` 在最终 ZIP 生成后调用同一测试工程的静态包验收器：直接读取 ZIP、PE 元数据和 .NET bundle，不加载产品程序集或运行 EXE。检查 Release XBF 与构建输出一致、文案与源资源一致、apphost 内嵌 deps/runtimeconfig 的范围和格式、共享 .NET 10 与 x64 目标、EXE/DLL 版本，以及依赖图中每个托管／原生资产的存在、版本或位数。验收失败中止发布。测试样本、打包暂存和原生文件版本读取均使用 `%TEMP%\eric\ericworkhub` 下的唯一隔离目录，完成后清理，不在仓库中创建临时目录；指定的发行输出目录只保存最终 ZIP。普通根目录回归覆盖损坏的 bundle 头与越界条目。
 
 参照依据：[微软 WinUI 自定义资源管理设计](https://github.com/microsoft/microsoft-ui-xaml/blob/main/docs/design-notes/custom-mrt-resourcemanager.md)、[Windows App SDK 部署说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/deploy-overview)。缺少共享运行库的机器需要先安装运行库，Office 企业版本身不能替代这两项依赖。
 

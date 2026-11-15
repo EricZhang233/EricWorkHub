@@ -77,7 +77,7 @@ internal static class ReleasePackageValidation
                     && dependency.GetMetadataReader().GetAssemblyDefinition().Version.ToString() != version.GetString()) throw new InvalidDataException("Dependency version mismatch: " + name);
             }
         }
-        string directory = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(archivePath))!, "inspect-" + Guid.NewGuid().ToString("N"));
+        string directory = Path.Combine(ConfigService.SystemCachePath, "package-validation", "inspect-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
         {

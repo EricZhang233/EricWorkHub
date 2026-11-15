@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot '../../.github/scripts/ReleaseTools.psm1') -Force
-$workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../artifacts'))
+$workspace = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) 'eric/ericworkhub/tests'))
 $fixture = Join-Path $workspace ('package-tests-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 $required = @('EricWorkHub.exe', 'EricWorkHub.dll', 'YamlDotNet.dll', 'e_sqlite3.dll', 'Microsoft.WindowsAppRuntime.Bootstrap.dll')
