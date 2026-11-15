@@ -23,9 +23,9 @@ internal static class OfficeManagerTests
         finally { CultureInfo.CurrentUICulture = previousCulture; }
         var emptyHub = new HubService((_, _) => Task.FromResult<IReadOnlyList<DetectedApp>>([]),
             (_, _) => Task.FromResult(new RecentResult([], [], false)));
-        check(emptyHub.Snapshot.Apps.Single().Definition.IsOfficeManager, "Office Setup is present before application detection");
-        check((await emptyHub.RefreshAsync(true, default))!.Apps.Single().Definition.IsOfficeManager,
-            "Office Setup remains visible when no Office application is installed");
+        check(emptyHub.Snapshot.Apps.Count == 0, "application snapshots start without a synthetic manager row");
+        check((await emptyHub.RefreshAsync(true, default))!.Apps.Count == 0,
+            "empty application detection does not insert the manager into the installed application list");
 
         var normal = new OfficeSetupProcess(123, new IntPtr(456));
         using var unusedClient = new HttpClient(new Handler(_ => throw new Exception("Unexpected download")));

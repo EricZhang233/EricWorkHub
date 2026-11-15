@@ -10,7 +10,7 @@ internal sealed class HubService
     private readonly RecentSourceCache _recent = new();
     private readonly Func<bool, CancellationToken, Task<IReadOnlyList<DetectedApp>>> _detect;
     private readonly Func<IReadOnlyList<DetectedApp>, CancellationToken, Task<RecentResult>> _collect;
-    private HubSnapshot _snapshot = new([AppCatalog.OfficeManager], [], []);
+    private HubSnapshot _snapshot = new([], [], []);
     public HubSnapshot Snapshot => _snapshot;
 
     public HubService(Func<bool, CancellationToken, Task<IReadOnlyList<DetectedApp>>>? detect = null,
@@ -34,7 +34,7 @@ internal sealed class HubService
                 var installed = apps.Where(app => app.IsInstalled).Select(app => app.Definition.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 _snapshot = _snapshot with
                 {
-                    Apps = apps.Where(app => !app.Definition.IsOfficeManager && app.IsInstalled).Append(AppCatalog.OfficeManager).ToArray(),
+                    Apps = apps.Where(app => app.IsInstalled).ToArray(),
                     Documents = RecentSourceCache.Filter(_snapshot.Documents, ConfigService.Settings, installed, cancellation)
                 };
                 applicationsReady?.Invoke(_snapshot);
@@ -43,7 +43,7 @@ internal sealed class HubService
                 cancellation.ThrowIfCancellationRequested();
                 var warnings = recent.Warnings.ToList();
                 if (_apps.Warning != null) warnings.Add(_apps.Warning);
-                _snapshot = new(apps.Where(app => !app.Definition.IsOfficeManager && app.IsInstalled).Append(AppCatalog.OfficeManager).ToArray(),
+                _snapshot = new(apps.Where(app => app.IsInstalled).ToArray(),
                     recent.AllSourcesFailed && !recent.HasSourceSnapshots ? _snapshot.Documents : recent.Items.ToArray(), warnings.Distinct().ToArray());
             }
             catch (OperationCanceledException) { throw; }

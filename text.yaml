@@ -8,6 +8,11 @@ Releases: 发布记录
 About: 关于 EricWorkHub，由 EricZhang 开发
 Author: Developed by EricZhang
 Apps: 应用
+AppsTabMsOffice: MsOffice
+AppsTabArtCraft: ArtCraft
+AppsSwitchTooltip: 点击 MsOffice／ArtCraft 分段切换应用页，不保存选中状态。
+MsOfficeTabTooltip: "MsOffice\n单击切换应用页；已选中时再次单击或右键打开 Office 安装与维护菜单。"
+ArtCraftTabTooltip: "ArtCraft\n创作应用页，暂留空白。"
 Recent: 最近文档
 AppsEmpty: 未检测到可用应用，安装后将自动更新。
 AppDescription_Notepad: 纯文本编辑工具
@@ -27,8 +32,6 @@ AppDescription_Clipchamp: 视频剪辑工具
 AppDescription_Project: 项目规划与进度管理工具
 AppDescription_Visio: 流程图与图表绘制工具
 AppDescription_Skype: 企业即时通信与会议工具
-AppDescription_OfficeManager: Office 安装与维护工具
-OfficeManagerTooltip: "Office Setup\n修改／修复已安装的 Office，或从微软获取最新安装器。\n已有安装或维护进程运行时直接切换到该进程。"
 OfficeManagerRepair: 修改／修复当前 Office
 OfficeManagerInstall: 获取并运行最新安装器
 OfficeManagerBusy: 正在处理 Office 安装与维护…

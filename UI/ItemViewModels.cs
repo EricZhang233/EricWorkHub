@@ -38,15 +38,12 @@ public sealed class RecentItemViewModel : IconViewModel
 
 public sealed class OfficeAppItem : IconViewModel
 {
-    private bool _isBusy;
-    public bool IsBusy { get => _isBusy; internal set { if (_isBusy == value) return; _isBusy = value; Changed(); Changed(nameof(Description)); } }
-    public string PlaceholderGlyph => Model.Definition.IsOfficeManager ? "\uE713" : "\uE71D";
     internal int IconRequest { get; set; }
     internal DetectedApp Model { get; private set; }
     internal OfficeAppItem(DetectedApp app) => Model = app;
     public string DisplayName => Model.Definition.Name;
     public bool IsInstalled => Model.IsInstalled;
-    public string Description => IsBusy ? Text.T("OfficeManagerBusy") : Model.Definition.Description;
+    public string Description => Model.Definition.Description;
     public string ToolTipText => Model.Definition.ToolTipText;
     internal void Update(DetectedApp model)
     {

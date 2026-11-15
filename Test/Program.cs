@@ -116,8 +116,8 @@ try
             _ => Task.FromResult(new RecentResult([], [], false))
         });
     var initialSnapshot = await hub.RefreshAsync(true, default);
-    Check(initialSnapshot is { Apps.Count: 2, Documents.Count: 1 } && initialSnapshot.Apps[^1].Definition.IsOfficeManager,
-        "Core filters uninstalled applications and pins Office Setup at the end");
+    Check(initialSnapshot is { Apps.Count: 1, Documents.Count: 1 } && initialSnapshot.Apps[0].Definition.Key == "Word",
+        "Core application lists contain installed applications without a synthetic manager entry");
     phase = 1;
     var failedSnapshot = await hub.RefreshAsync(true, default);
     Check(initialSnapshot!.Documents.SequenceEqual(failedSnapshot!.Documents) && failedSnapshot.Warnings.Single() == "fixture-source-failure", "all-source failures preserve the last document snapshot");

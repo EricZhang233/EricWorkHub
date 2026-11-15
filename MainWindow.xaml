@@ -67,7 +67,27 @@
             </Grid.ColumnDefinitions>
             <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <TextBlock Text="{x:Bind local:Text.T('Apps')}" FontSize="20" FontWeight="SemiBold" Margin="12,0,0,12"/>
+                <Border Height="32" Margin="4,0,4,12" Padding="3" CornerRadius="7" BorderThickness="1"
+                    Background="{ThemeResource ControlAltFillColorTertiaryBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    ToolTipService.ToolTip="{x:Bind local:Text.T('AppsSwitchTooltip')}">
+                    <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border x:Name="ApplicationSwitchSelection" CornerRadius="4" BorderThickness="1" IsHitTestVisible="False"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"/>
+                    <RadioButton x:Name="MsOfficeTab" GroupName="ApplicationTabs" IsChecked="True" Style="{StaticResource ApplicationSwitchSegmentStyle}"
+                        Click="ApplicationTab_Click" ContextRequested="ApplicationTab_ContextRequested" PreviewKeyDown="ApplicationTab_KeyDown"
+                        AutomationProperties.Name="{x:Bind local:Text.T('AppsTabMsOffice')}"
+                        ToolTipService.ToolTip="{x:Bind local:Text.T('MsOfficeTabTooltip')}">
+                        <TextBlock x:Name="MsOfficeTabLabel" Text="{x:Bind local:Text.T('AppsTabMsOffice')}" FontSize="13" TextAlignment="Center" VerticalAlignment="Center"/>
+                    </RadioButton>
+                    <RadioButton x:Name="ArtCraftTab" Grid.Column="1" GroupName="ApplicationTabs" Style="{StaticResource ApplicationSwitchSegmentStyle}"
+                        Click="ApplicationTab_Click" ContextRequested="ApplicationTab_ContextRequested" PreviewKeyDown="ApplicationTab_KeyDown"
+                        AutomationProperties.Name="{x:Bind local:Text.T('AppsTabArtCraft')}"
+                        ToolTipService.ToolTip="{x:Bind local:Text.T('ArtCraftTabTooltip')}">
+                        <TextBlock x:Name="ArtCraftTabLabel" Text="{x:Bind local:Text.T('AppsTabArtCraft')}" FontSize="13" TextAlignment="Center" VerticalAlignment="Center"/>
+                    </RadioButton>
+                    </Grid>
+                </Border>
                 <ListView x:Name="OfficeList" Grid.Row="1" ItemsSource="{x:Bind OfficeApps}" SelectionMode="None"
                     IsItemClickEnabled="True" ItemClick="OfficeList_ItemClick" Background="Transparent">
                     <ListView.ItemContainerTransitions><TransitionCollection/></ListView.ItemContainerTransitions>
@@ -90,9 +110,8 @@
                                 </ToolTipService.ToolTip>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <Grid Width="48" Height="48">
-                                    <FontIcon Glyph="{x:Bind PlaceholderGlyph}" FontSize="28" Opacity="0.2" Visibility="{x:Bind PlaceholderVisibility, Mode=OneWay}"/>
+                                    <FontIcon Glyph="&#xE71D;" FontSize="28" Opacity="0.2" Visibility="{x:Bind PlaceholderVisibility, Mode=OneWay}"/>
                                     <Image Source="{x:Bind Icon, Mode=OneWay}" Stretch="Uniform" Width="44" Height="44"/>
-                                    <ProgressRing Width="24" Height="24" IsActive="{x:Bind IsBusy, Mode=OneWay}"/>
                                 </Grid>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
@@ -103,11 +122,12 @@
                     </ListView.ItemTemplate>
                 </ListView>
                 <TextBlock x:Name="AppsEmpty" Grid.Row="1" Text="{x:Bind local:Text.T('AppsEmpty')}" TextWrapping="Wrap" Margin="12,24" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed"/>
+                <Grid x:Name="ArtCraftPanel" Grid.Row="1" Visibility="Collapsed" Background="Transparent"/>
             </Grid>
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,12">
-                    <TextBlock Text="{x:Bind local:Text.T('Recent')}" FontSize="20" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" Spacing="12" MinHeight="32" Margin="0,0,0,12">
+                    <TextBlock Text="{x:Bind local:Text.T('Recent')}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <ProgressRing x:Name="BusyIndicator" Width="16" Height="16" IsActive="False"/>
                 </StackPanel>
                 <local:ResizableDocumentPanel x:Name="DocumentPanel" Grid.Row="1" Background="Transparent">

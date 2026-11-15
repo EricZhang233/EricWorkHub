@@ -1,10 +1,10 @@
 namespace EricWorkHub;
 
 internal sealed record OfficeAppDefinition(string Key, string Name, string[] ExeNames, string[] ExtraPaths,
-    string[] PackageNames, bool HasRecentDocuments = false, bool IsOfficeManager = false)
+    string[] PackageNames, bool HasRecentDocuments = false)
 {
     public string Description => Text.T("AppDescription_" + Key);
-    public string ToolTipText => IsOfficeManager ? Text.T("OfficeManagerTooltip") : Text.F("AppDescriptionTooltip", Name, Description);
+    public string ToolTipText => Text.F("AppDescriptionTooltip", Name, Description);
     public bool PreferPackagedVersion => Key is "Notepad" or "Paint";
 }
 internal sealed record DetectedApp(OfficeAppDefinition Definition, string? Executable, string? AppUserModelId, string[]? RecentAppIds = null)
@@ -14,7 +14,6 @@ internal sealed record DetectedApp(OfficeAppDefinition Definition, string? Execu
 
 internal static class AppCatalog
 {
-    public static readonly DetectedApp OfficeManager = new(new("OfficeManager", "Office Setup", [], [], [], IsOfficeManager: true), null, null);
     public static readonly string[] OfficeVersions = ["16.0", "15.0", "14.0"];
     private static string Local(params string[] parts) => Path.Combine([Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), .. parts]);
     private static string SystemFile(string name) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), name);

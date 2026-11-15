@@ -22,7 +22,7 @@ public sealed partial class MainWindow : Window
     private readonly OfficeManagerService _officeManager = new();
     private readonly IconService _icons = new();
     private readonly ForegroundRefreshPolicy _refresh = new();
-    private bool _closed;
+    private bool _closed, _artCraftSelected, _officeManagerBusy, _applicationsLoaded;
     private XamlRoot? _titleBarXamlRoot;
     private IntPtr _windowIcon;
     private WindowStateTracker? _windowState;
@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
         _timer.Tick += OnTimer;
 
         ApplyApps(_hub.Snapshot.Apps, false);
+        ApplyApplicationTab();
     }
 
     private void InitializeTitleBar()
@@ -136,6 +137,7 @@ public sealed partial class MainWindow : Window
             var snapshot = await _hub.RefreshAsync(true, _shutdown.Token, ready =>
             {
                 if (_closed) return;
+                _applicationsLoaded = true;
                 ApplyApps(ready.Apps, false);
                 ApplyRecent(ready.Documents);
                 UpdateAppsEmptyState();
@@ -175,7 +177,6 @@ public sealed partial class MainWindow : Window
 
     private async Task LoadAppIconAsync(OfficeAppItem item)
     {
-        if (item.Model.Definition.IsOfficeManager) return;
         int request = ++item.IconRequest;
         try
         {
@@ -197,7 +198,58 @@ public sealed partial class MainWindow : Window
 
     private void UpdateAppsEmptyState()
     {
-        AppsEmpty.Visibility = OfficeApps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        AppsEmpty.Visibility = !_artCraftSelected && _applicationsLoaded && OfficeApps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ApplyApplicationTab()
+    {
+        MsOfficeTab.IsChecked = !_artCraftSelected;
+        ArtCraftTab.IsChecked = _artCraftSelected;
+        Grid.SetColumn(ApplicationSwitchSelection, _artCraftSelected ? 1 : 0);
+        MsOfficeTabLabel.FontWeight = _artCraftSelected ? Microsoft.UI.Text.FontWeights.Normal : Microsoft.UI.Text.FontWeights.SemiBold;
+        ArtCraftTabLabel.FontWeight = _artCraftSelected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+        MsOfficeTabLabel.Opacity = _artCraftSelected ? 0.6 : 1;
+        ArtCraftTabLabel.Opacity = _artCraftSelected ? 1 : 0.6;
+        OfficeList.Visibility = _artCraftSelected ? Visibility.Collapsed : Visibility.Visible;
+        ArtCraftPanel.Visibility = _artCraftSelected ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAppsEmptyState();
+    }
+
+    private void SelectApplicationTab(bool artCraft)
+    {
+        bool changed = _artCraftSelected != artCraft;
+        _artCraftSelected = artCraft;
+        ApplyApplicationTab();
+        if (changed) LogService.Write("UI", $"Application tab selected tab={(artCraft ? "ArtCraft" : "MsOffice")}");
+    }
+
+    private void ApplicationTab_Click(object sender, RoutedEventArgs args)
+    {
+        if (_closed) return;
+        bool artCraft = ReferenceEquals(sender, ArtCraftTab);
+        bool alreadySelected = _artCraftSelected == artCraft;
+        SelectApplicationTab(artCraft);
+        if (alreadySelected && !artCraft) ShowOfficeManagerMenu();
+    }
+
+    private void ApplicationTab_ContextRequested(UIElement sender, ContextRequestedEventArgs args)
+    {
+        args.Handled = true;
+        if (ReferenceEquals(sender, MsOfficeTab)) ShowOfficeManagerMenu();
+    }
+
+    private void ApplicationTab_KeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        bool? artCraft = args.Key switch
+        {
+            Windows.System.VirtualKey.Left or Windows.System.VirtualKey.Up or Windows.System.VirtualKey.Home => false,
+            Windows.System.VirtualKey.Right or Windows.System.VirtualKey.Down or Windows.System.VirtualKey.End => true,
+            _ => null
+        };
+        if (!artCraft.HasValue) return;
+        SelectApplicationTab(artCraft.Value);
+        (_artCraftSelected ? ArtCraftTab : MsOfficeTab).Focus(FocusState.Keyboard);
+        args.Handled = true;
     }
 
     private async void RecentList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
@@ -247,47 +299,38 @@ public sealed partial class MainWindow : Window
     private async void OfficeList_ItemClick(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is not OfficeAppItem app) return;
-        if (app.Model.Definition.IsOfficeManager) { await ShowOfficeManagerAsync(app); return; }
         RenderOperation(await _operations.OpenAppAsync(app.Model));
     }
 
-    private async Task ShowOfficeManagerAsync(OfficeAppItem item)
+    private void ShowOfficeManagerMenu()
     {
-        if (item.IsBusy) return;
-        item.IsBusy = true;
         try
         {
-            if (await _officeManager.FindRunningAsync(_shutdown.Token) is { } process)
-            {
-                RenderOfficeManager(new(process));
-                return;
-            }
             if (_closed) return;
             var menu = new MenuFlyout();
-            var repair = new MenuFlyoutItem { Text = Text.T("OfficeManagerRepair"), Icon = new FontIcon { Glyph = "\uE90F" } };
-            var install = new MenuFlyoutItem { Text = Text.T("OfficeManagerInstall"), Icon = new FontIcon { Glyph = "\uE896" } };
-            repair.Click += async (_, _) => await RunOfficeManagerAsync(item, OfficeManagerAction.Repair);
-            install.Click += async (_, _) => await RunOfficeManagerAsync(item, OfficeManagerAction.Install);
+            var repair = new MenuFlyoutItem { Text = Text.T("OfficeManagerRepair"), Icon = new FontIcon { Glyph = "\uE90F" }, IsEnabled = !_officeManagerBusy };
+            var install = new MenuFlyoutItem { Text = Text.T("OfficeManagerInstall"), Icon = new FontIcon { Glyph = "\uE896" }, IsEnabled = !_officeManagerBusy };
+            repair.Click += async (_, _) => await RunOfficeManagerAsync(OfficeManagerAction.Repair);
+            install.Click += async (_, _) => await RunOfficeManagerAsync(OfficeManagerAction.Install);
             menu.Items.Add(repair);
             menu.Items.Add(install);
-            menu.ShowAt(OfficeList.ContainerFromItem(item) as FrameworkElement ?? OfficeList);
+            menu.ShowAt(MsOfficeTab);
+            LogService.Write("OfficeManager", "Office maintenance menu opened from application tab");
         }
-        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
         catch (Exception ex)
         {
             LogService.Write("OfficeManager", "Office manager menu unavailable", ex, level: LogService.LogLevel.Error);
             if (!_closed) ShowWarning(Text.T("OfficeManagerFailed"));
         }
-        finally { item.IsBusy = false; }
     }
 
-    private async Task RunOfficeManagerAsync(OfficeAppItem item, OfficeManagerAction action)
+    private async Task RunOfficeManagerAsync(OfficeManagerAction action)
     {
-        if (item.IsBusy) return;
-        item.IsBusy = true;
+        if (_officeManagerBusy) return;
+        _officeManagerBusy = true;
         try { RenderOfficeManager(await _officeManager.RunAsync(action, _shutdown.Token)); }
         catch (OperationCanceledException) when (_shutdown.IsCancellationRequested) { }
-        finally { item.IsBusy = false; }
+        finally { _officeManagerBusy = false; }
     }
 
     private void RenderOfficeManager(OfficeManagerResult result)

@@ -71,7 +71,7 @@ internal static class TodoTests
         var fast = new HubService((_, _) => Task.FromResult<IReadOnlyList<DetectedApp>>([app]), (_, _) => { collecting.TrySetResult(); return collected.Task; });
         var refresh = fast.RefreshAsync(true, default, snapshot => ready = snapshot);
         await collecting.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        check(ready is { Apps.Count: 2, Documents.Count: 0 } && !refresh.IsCompleted && ready.Apps[0].Definition.Key == "Word",
+        check(ready is { Apps.Count: 1, Documents.Count: 0 } && !refresh.IsCompleted && ready.Apps[0].Definition.Key == "Word",
             "installed applications are published before a slow document source completes");
         collected.SetResult(new([document], [], false));
         check((await refresh)!.Documents.Single() == document, "document collection fills the existing application snapshot afterward");
